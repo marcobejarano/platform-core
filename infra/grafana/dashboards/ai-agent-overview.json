@@ -1,0 +1,82 @@
+{
+  "uid": "ai-hybrid-overview",
+  "title": "AI Agents - Hybrid Overview",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Requests",
+      "id": 1,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(agent_requests_total)", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "none" } }
+    },
+    {
+      "type": "stat",
+      "title": "Requests/sec (5m)",
+      "id": 2,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "rate(agent_requests_total[5m])", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "req/s" } }
+    },
+    {
+      "type": "stat",
+      "title": "Tokens/sec (5m)",
+      "id": 3,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "rate(agent_tokens_total[5m])", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "tokens/s" } }
+    },
+    {
+      "type": "stat",
+      "title": "Estimated Cost (USD, 5m avg)",
+      "id": 4,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "avg_over_time(agent_estimated_cost_usd[5m])", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate (last 6h)",
+      "id": 10,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "rate(agent_requests_total[1m])", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens Rate (last 6h)",
+      "id": 11,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "rate(agent_tokens_total[1m])", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Estimated Cost (USD)",
+      "id": 12,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "agent_estimated_cost_usd", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "type": "stat",
+      "title": "Firing Alerts",
+      "id": 20,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(ALERTS{alertstate=\"firing\"})", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "none" } }
+    },
+    {
+      "type": "text",
+      "title": "Quick Links",
+      "id": 30,
+      "options": {
+        "content": "**Traces:** Open Tempo (Traces UI) → use trace_id from logs to jump to traces.\n\n**Logs:** Use Explore → Loki datasource.\n\nTip: Click a log line with `trace_id` to jump to Tempo.",
+        "mode": "markdown"
+      }
+    }
+  ],
+  "templating": { "list": [] }
+}

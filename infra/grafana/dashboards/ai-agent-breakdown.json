@@ -1,0 +1,41 @@
+{
+  "uid": "ai-agent-breakdown",
+  "title": "AI Agents - Breakdown",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Requests by Service (rate, 5m)",
+      "id": 1,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (service_name) (rate(agent_requests_total[5m]))", "refId": "A" } ],
+      "legend": { "show": true }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens by Service (rate, 5m)",
+      "id": 2,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (service_name) (rate(agent_tokens_total[5m]))", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Estimated Cost by Service (total, 5m)",
+      "id": 3,
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum by (service_name) (avg_over_time(agent_estimated_cost_usd[5m]))", "refId": "A" } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "type": "logs",
+      "title": "Recent Logs (Loki)",
+      "id": 10,
+      "datasource": "Loki",
+      "targets": [ { "expr": "{job=\"agent\"}", "refId": "A" } ]
+    }
+  ],
+  "templating": { "list": [] }
+}

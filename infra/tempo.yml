@@ -1,0 +1,38 @@
+server:
+  http_listen_port: 3200      # Grafana connects to this (for UI / API)
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317  # OTLP gRPC receiver
+        http:
+          endpoint: 0.0.0.0:4318  # OTLP HTTP receiver
+
+ingester:
+  trace_idle_period: 10s      # How long to wait before flushing traces
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    compacted_block_retention: 24h
+
+storage:
+  trace:
+    backend: local            # Store traces on local disk (simple for demos)
+    wal:
+      path: /tmp/tempo/wal
+    local:
+      path: /tmp/tempo/blocks
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+  storage:
+    path: /tmp/tempo/metrics
+
+overrides:
+  max_traces_per_user: 100000

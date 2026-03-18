@@ -1,0 +1,20 @@
+# Ignore virtual environments
+.venv/
+env/
+__pycache__/
+
+# Ignore infra and local tooling
+infra/
+docs/
+tests/
+*.log
+
+# Ignore OS and IDE clutter
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Ignore git and local project files
+.git/
+.gitignore

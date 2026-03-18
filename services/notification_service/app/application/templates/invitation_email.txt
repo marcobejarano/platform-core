@@ -1,0 +1,9 @@
+Hello,
+
+You have been invited to join a tenant.
+
+Role: {{ role }}
+
+Accept the invitation here:
+
+{{ invitation_link }}

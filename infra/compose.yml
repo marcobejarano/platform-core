@@ -1,0 +1,195 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.144.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    ports:
+      - "4317:4317"   # OTLP gRPC endpoint
+      - "4318:4318"   # OTLP HTTP endpoint (optional)
+      - "8889:8889"   # Prometheus metrics (changed from 8888)
+    volumes:
+      - ./otel-collector/config.yml:/etc/otel/config.yaml
+    networks:
+      - platform_core_network
+    # No healthcheck available (distroless image)
+    restart: always
+
+  tempo:
+    image: grafana/tempo:2.10.0
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yml" ]
+    volumes:
+      - ./tempo.yml:/etc/tempo.yml
+    ports:
+      - "3200:3200"   # HTTP API
+    networks:
+      - platform_core_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus_alerts.yml:/etc/prometheus/alerts.yml
+    networks:
+      - platform_core_network
+    depends_on:
+      - otel-collector
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  loki:
+    image: grafana/loki:3.6.4
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./loki.yml:/etc/loki/config.yml
+      - loki-data:/loki
+    networks:
+      - platform_core_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  grafana:
+    image: grafana/grafana:12.3.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      # Provisioning YAMLs
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      # Actual dashboards go here (JSON files)
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      # Persistent Grafana data (DB, plugins, etc.)
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - platform_core_network
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 240s
+
+  alertmanager:
+    image: prom/alertmanager:v0.30.1
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/config.yml
+    networks:
+      - platform_core_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9093"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redpanda-0:
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      # Address the broker advertises to clients that connect to the Kafka API.
+      # Use the internal addresses to connect to the Redpanda brokers'
+      # from inside the same Docker network.
+      # Use the external addresses to connect to the Redpanda brokers'
+      # from outside the Docker network.
+      - --advertise-kafka-addr internal://redpanda-0:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      # Address the broker advertises to clients that connect to the HTTP Proxy.
+      - --advertise-pandaproxy-addr internal://redpanda-0:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      # Redpanda brokers use the RPC API to communicate with each other internally.
+      - --rpc-addr redpanda-0:33145
+      - --advertise-rpc-addr redpanda-0:33145
+      # Mode dev-container uses well-known configuration properties for development in containers.
+      - --mode dev-container
+      # Tells Seastar (the framework Redpanda uses under the hood) to use 1 core on the system.
+      - --smp 1
+      - --default-log-level=info
+    image: redpandadata/redpanda:v25.3.6
+    container_name: redpanda-0
+    volumes:
+      - redpanda-0:/var/lib/redpanda/data
+    networks:
+      - platform_core_network
+    ports:
+      - 18081:18081
+      - 18082:18082
+      - 19092:19092
+      - 19644:9644
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  console:
+    container_name: redpanda-console
+    image: redpandadata/console:v3.5.0
+    networks:
+      - platform_core_network
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda-0:9092"]
+        schemaRegistry:
+          enabled: true
+          urls: ["http://redpanda-0:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda-0:9644"]
+    ports:
+      - 8080:8080
+    depends_on:
+      - redpanda-0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  platform_core_network:
+    driver: bridge
+    name: platform_core_network
+
+volumes:
+  loki-data:
+    name: loki-data
+  grafana-storage:
+    name: grafana-storage
+  redpanda-0:
+    name: redpanda-0

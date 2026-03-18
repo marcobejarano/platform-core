@@ -1,0 +1,22 @@
+groups:
+  - name: ai_agent_alerts
+    rules:
+      # Smoke test / pipeline sanity check
+      - alert: HighRequests
+        expr: agent_requests_total > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent received requests"
+          description: "agent_requests_total is greater than 0"
+
+      # Real production-worthy threshold alert
+      - alert: HighRequestRate
+        expr: rate(agent_requests_total[5m]) > 50   # >50 requests/sec over last 5 min
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High agent request rate"
+          description: "Request rate has exceeded 50 requests/sec over the last 5 minutes"
